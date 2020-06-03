@@ -8,7 +8,7 @@ const cors = require('cors')({
 });
 var twilio = require('twilio');
 const twilio_accountSid = 'AC0ffe354bb1064b240f2c38ae8eef3744';
-const twilio_authToken = '2c5c388e7ba125a02e290eeb51cca88e';
+const twilio_authToken = 'f26f395b0220b4e779c68ba6540b3d7f';
 var http = require('http');
 const MessagingResponse = require('twilio').twiml.MessagingResponse;
 
@@ -17,7 +17,7 @@ const MessagingResponse = require('twilio').twiml.MessagingResponse;
 //===========TEST FUNCTION======================================================================
 //{ INVITE A NEW FRIEND also puts  unique_id into user phone number structure 
 //https://us-central1-brutest2-62192.cloudfunctions.net/textMeats
-exports.test_text = functions.pubsub.schedule('every 2 minutes').onRun((context) => {
+exports.test_text = functions.pubsub.schedule('every 23 hours').onRun((context) => {
 	// Grab the unique_id parameter from the GET request
     //unique_id=String(Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15));
     var phone = '7174756561';
@@ -36,16 +36,18 @@ exports.test_text = functions.pubsub.schedule('every 2 minutes').onRun((context)
 		to: '+1'+phone,
 		from: '+17176960783',
 		//body: 'http://www.apple.com/iphone',
-		body: days_left+' days til BABY TIME!!!! yay!',
+		body: 'airplane!',
 	  },
-	  (err, message) => {
-		console.log(message.sid);
+	  function(err,message){
+		  if(err){
+			  console.log(err);
+		  }else{
+			  console.log(message.sid);
+		  }
 	  }
+	  
 	);
-	return{
-		message: 'thanks',
-	};
-	
+	return(0);	
 	
 });
 //}
