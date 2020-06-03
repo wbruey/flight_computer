@@ -95,22 +95,23 @@ exports.grab_log_cell = functions.pubsub.schedule('every 23 hours').onRun((conte
 	//function listMajors(auth) {
 	  const sheets = google.sheets({version: 'v4', auth: functions.config().google_auth.api_key});
 	  sheets.spreadsheets.values.get({
-		spreadsheetId: '1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms',
-		range: 'Class Data!A2:E',
+		spreadsheetId: '1drcYhNrzV9IPNpCUqKCbhdVfr3wlQ-eW8p_zujWRMu0',
+		range: 'Routine!A9:B13',
 	  }, (err, res) => {
 		if (err) return console.log('The API returned an error: ' + err);
 		const rows = res.data.values;
 		if (rows.length) {
-		  console.log('Name, Major:');
+		  console.log('Item, Interval:');
 		  // Print columns A and E, which correspond to indices 0 and 4.
 		  rows.map((row) => {
-			console.log(`${row[0]}, ${row[4]}`);
+			console.log(`${row[0]}, ${row[1]}`);
 		  });
 		} else {
 		  console.log('No data found.');
 		}
 	  });
 	//}
+	return(0);
 });
 
 
