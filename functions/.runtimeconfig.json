@@ -1,0 +1,11 @@
+{
+  "google_auth": {
+    "redirect_uris": "[urn:ietf:wg:oauth:2.0:oob,http://localhost]",
+    "api_key": "AIzaSyCMPbs-XBKLb_odiPtzXUY1rt5tV4x8Wbc",
+    "client_secret": "0VgqSdmNwwMmu48fhNdUMczQ",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "client_id": "576511393513-mh3cub6ofq0okk85nvglibg0l1d4imgh.apps.googleusercontent.com",
+    "project_id": "flightcomputer-2c62d",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth"
+  }
+}
