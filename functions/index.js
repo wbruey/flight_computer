@@ -14,22 +14,22 @@ const nodemailer = require('nodemailer');
 
 
 
-//returns a promise to grab spreadsheet data from google API given a spreadsheet ID and a range to grab data from
-function grab_spreadsheet_data(spreadsheetId,range){
+//returns a promise to grab spreadsheet data from google API given a spreadsheet ID and a ranges to grab data from
+function grab_batch_spreadsheet_data(spreadsheetId,ranges){
 	//construct the promise to return
 	const googles_promise = new Promise((resolve,reject)=>{
 		const sheets = google.sheets({version: 'v4', auth: functions.config().google_auth.api_key});  //create a google sheets object interface object with my api key
-		sheets.spreadsheets.values.get({  //use that api object to get spreadsheet data in a spreadsheet at a range
+		sheets.spreadsheets.values.batchGet({  //use that api object to get spreadsheet data in a spreadsheet at a ranges
 			spreadsheetId: spreadsheetId,
-			range: range,
+			ranges: ranges,
 		}, (err, res) => {
 			if (err){
 				console.log('Google API didnt work');
 				throw new Error(err);
 			} else {
-				const rows = res.data.values;
-				if (rows.length) {
-				  resolve(rows);
+				const valueRanges = res.data.valueRanges;
+				if (valueRanges.length) {
+				  resolve(valueRanges);
 				} else {
 				  console.log('Sheets API worked but no (blank) data found at google sheet.');
 				}
@@ -93,46 +93,74 @@ function send_email(to,from,subject,html){
 
 
 //=======EMAIL WILL TOTAL MAINTENACE SUMMARY===============
-exports.email_maintenance_summary = functions.pubsub.schedule('every 5 days').onRun((context) => { 
+exports.email_maintenance_summary = functions.pubsub.schedule('every 2 minutes').onRun((context) => { 
 	
 	//first get the maintenance report
-	const time_spreadsheetId='1drcYhNrzV9IPNpCUqKCbhdVfr3wlQ-eW8p_zujWRMu0';
-	const header_range='routine_time!B1:C2';
-	const time_data_range='routine_time!A7:D';
+	const spreadsheet='1drcYhNrzV9IPNpCUqKCbhdVfr3wlQ-eW8p_zujWRMu0';
+	const data_ranges=['routine_time!B1:C2','routine_time!A7:D','routine_use!B1:B2','routine_use!A7:D'];
 	
 	var html='<p>ERROR</p>';
 	var todays_date='error';
+	var todays_tach='error';
+	var days_to_go='error';
+	var hours_to_go='error';
+	var day_of_the_week='error';
 	
 	//get a promise to do the things (grab data and then email) then do them.
-	const promise_grab_maintenance = grab_spreadsheet_data(time_spreadsheetId,header_range)
+	const promise_grab_maintenance = grab_batch_spreadsheet_data(spreadsheet,data_ranges)
 		//then format the data from the spreadsheeet to create the message you want to send.  remember, youre passing a function to the .then method slot.
-		.then((rows) =>{
-			console.log('Mainteance data gathered: ' + 'Today is ' + rows[0][0] + ' '+ rows[0][1] + '. You have ' + rows[1][1] + ' days left until you are late on plane maintence.');
-			todays_date=rows[0][1];
-			html=`
-			<h1 style="margin-bottom:0px;"><u>`+rows[1][1]+`</u> Days Left</h1>
-			<h2 style="display:inline;margin-bottom:0px;">`+rows[0][0]+`</h2>
-			<h5 style="display:inline;line-height:0px;margin-top:-5px;">`+rows[0][1]+`</h5>
-			`
-			return grab_spreadsheet_data(time_spreadsheetId,time_data_range);
-		})
-		.then((rows) =>{
+		.then((valueRanges) =>{
+			
+			//first grab the rows from the first (zeroth) data set which has dates
+			dates=valueRanges[0].values;
+			console.log('Mainteance data gathered: ' + 'Today is ' + dates[0][0] + ' '+ dates[0][1] + '. You have ' + dates[1][1] + ' days left until you are late on plane maintence.');
+			todays_date=dates[0][1];
+			days_to_go=dates[1][1];
+			day_of_the_week=dates[0][0];
+
+			
+			//Next grab the rows from the 2nd data set which has time based maintenace items
+			days=valueRanges[1].values;
 			// sort by date due ... heres how to sort in javascript: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/sort
-			rows.sort((a,b)=>{return a[3]-b[3]});
-			//only take the first three rows (what needs to be maintained in the near term).
-			rows=rows.slice(0,3);
-			html=html+`<p style="line-height:0px"><b>Near-term Mainteance To Occur</b></p>`;
+			days.sort((a,b)=>{return a[3]-b[3]});
+			days=days.slice(0,3);
+
+
+			tachs=valueRanges[2].values;
+			//Next grab the rows from the 3rd data set which is plane hour information.
+			todays_tach=tachs[0][0];
+			hours_to_go=tachs[1][0];
+			console.log('Mainteance data gathered: ' + 'Tach is at: ' +todays_tach+ '. You have ' + hours_to_go + ' hours left until you are late on plane maintence.');
+			
+			// finally grab the rows from the 4th data set which is tach hours for maintenance items.
+			hours=valueRanges[3].values;
+			hours.sort((a,b)=>{return a[3]-b[3]});
+			hours=hours.slice(0,3);
+			
+			//print stuff to HTML starting with todays status and headers
+			html=`
+			<h1 style="margin-bottom:0px;"><u>`+days_to_go+`</u> Days Left  &  <u>`+hours_to_go+`</u> Tach Hours Left</h1>
+			<h2 style="display:inline;margin-bottom:0px;">`+day_of_the_week+`</h2>
+			<h5 style="display:inline;line-height:0px;margin-top:-5px;">`+todays_date+`</h5>
+			<table>
+				<tr>
+					<td><b>System</b></td>	 <td></td><td></td><td></td><td></td><td></td><td></td>   <td style="text-align:left"><b>Due</b></td>
+				</tr>
+			`;			
+			
+			//next is to iterate over near term maintenance and put that into the html
+			//first add suffix days or hours
+			days.map((day)=>{day.push('days')});
+			hours.map((hour)=>{hour.push('tach hours')});
+			//next concatinate them
+			nearterm_maintenances=days.concat(hours);
+			nearterm_maintenances.sort((a,b)=>{return a[3]-b[3]});
+			nearterm_maintenances.map((nearterm_maintenance)=>{
+				html=html+`<tr><td>${nearterm_maintenance[0]}</td>    <td></td><td></td><td></td><td></td><td></td><td></td>      <td>${nearterm_maintenance[3]} ${nearterm_maintenance[4]}</p>`;
+			});			
+			html=html+'</table>'
 			
 			
-			
-			if(rows.length){
-				rows.map((row)=>{
-					html=html+`<p style="line-height:0px">${row[0]}:${row[3]} days</p>`;
-				});
-			}else{
-				html=html+`<p>No Future Maintenance Items Found</p>`
-			}
-				
 			const to = 'willbruey@gmail.com';
 			const from = 'Bruey Airlines <airlines@brueyenterprises.com>';
 			const subject ='N171ML Maintenance Report - '+ todays_date;		
@@ -147,7 +175,7 @@ exports.email_maintenance_summary = functions.pubsub.schedule('every 5 days').on
 });
 
 //=======TEXT WILL TOTAL MAINTENACE SUMMARY===============
-exports.text_maintenance_summary = functions.pubsub.schedule('every 365 days').onRun((context) => { 
+exports.text_maintenance_summary = functions.pubsub.schedule('every 23 hours').onRun((context) => { 
 	
 	//define the spreadsheet to get data from and the phone number to send the text too.
 	const spreadsheetId='1drcYhNrzV9IPNpCUqKCbhdVfr3wlQ-eW8p_zujWRMu0';
@@ -175,7 +203,7 @@ exports.text_maintenance_summary = functions.pubsub.schedule('every 365 days').o
 
 
 //=======get and print user info to console===============
-exports.list_users = functions.pubsub.schedule('every 1000 days').onRun((context) => { 
+exports.list_users = functions.pubsub.schedule('every 23 hours').onRun((context) => { 
 
 	admin.auth().updateUser('cpIxtybEjuYwKGREJFJLWTHhvtZ2', {
 	  phoneNumber: '+17174756561'
@@ -213,7 +241,7 @@ exports.list_users = functions.pubsub.schedule('every 1000 days').onRun((context
 //==========GRAB A VALUE from the google spreadsheet and post it to console log. test function =====================================
 
 
-exports.grab_log_cell = functions.pubsub.schedule('every 1000 days').onRun((context) => { 
+exports.grab_log_cell = functions.pubsub.schedule('every 23 hours').onRun((context) => { 
 	//function listMajors(auth) {
 	  const sheets = google.sheets({version: 'v4', auth: functions.config().google_auth.api_key});
 	  sheets.spreadsheets.values.get({
@@ -245,7 +273,7 @@ exports.grab_log_cell = functions.pubsub.schedule('every 1000 days').onRun((cont
 // define the schedule
 
 
-exports.test_text = functions.pubsub.schedule('every 1000 days').onRun((context) => { 
+exports.test_text = functions.pubsub.schedule('every 23 hours').onRun((context) => { 
 	//define the phone number to send the text too.
 	var phone = '7174756561';
   	
@@ -277,7 +305,7 @@ exports.test_text = functions.pubsub.schedule('every 1000 days').onRun((context)
 //=======LEARNING ABOUT PROMISES===============
 
 
-exports.promise_test = functions.pubsub.schedule('every 1000 days').onRun((context) => { 
+exports.promise_test = functions.pubsub.schedule('every 23 hours').onRun((context) => { 
 
 	function fake_grab(text1,text2){
 		functions_promise = new Promise((resolve,reject)=>{
