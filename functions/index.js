@@ -150,11 +150,11 @@ exports.email_maintenance_summary = functions.pubsub.schedule('every 2 minutes')
 			
 			//next is to iterate over near term maintenance and put that into the html
 			//first add suffix days or hours
-			days.map((day)=>{day.push('days')});
-			hours.map((hour)=>{hour.push('tach hours')});
+			days.map((day)=>{day.push('days');day.push(day[3]);});
+			hours.map((hour)=>{hour.push('tach hours');hour.push(String(hour[3]*7));});  //multiply by 7 for hours so that when we sort we equivalent 1 tach hour to 7 days assuming i fly 1 hour per week this is just to look nice on the sort
 			//next concatinate them
 			nearterm_maintenances=days.concat(hours);
-			nearterm_maintenances.sort((a,b)=>{return a[3]-b[3]});
+			nearterm_maintenances.sort((a,b)=>{return a[5]-b[5]});
 			nearterm_maintenances.map((nearterm_maintenance)=>{
 				html=html+`<tr><td>${nearterm_maintenance[0]}</td>    <td></td><td></td><td></td><td></td><td></td><td></td>      <td>${nearterm_maintenance[3]} ${nearterm_maintenance[4]}</p>`;
 			});			
