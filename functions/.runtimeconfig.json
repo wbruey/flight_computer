@@ -1,15 +1,15 @@
 {
   "twilio_auth": {
     "account_sid": "AC0ffe354bb1064b240f2c38ae8eef3744",
-    "auth_token": "d5aa282258a85a5feecbcdaec719aecd"
+    "auth_token": "abb0f8aa6131c287bbc50675a700bb9c"
   },
   "google_auth": {
-    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "client_id": "576511393513-mh3cub6ofq0okk85nvglibg0l1d4imgh.apps.googleusercontent.com",
     "project_id": "flightcomputer-2c62d",
     "auth_uri": "https://accounts.google.com/o/oauth2/auth",
-    "api_key": "AIzaSyCMPbs-XBKLb_odiPtzXUY1rt5tV4x8Wbc",
+    "redirect_uris": "[urn:ietf:wg:oauth:2.0:oob,http://localhost]",
     "client_secret": "0VgqSdmNwwMmu48fhNdUMczQ",
-    "client_id": "576511393513-mh3cub6ofq0okk85nvglibg0l1d4imgh.apps.googleusercontent.com",
-    "redirect_uris": "[urn:ietf:wg:oauth:2.0:oob,http://localhost]"
+    "api_key": "AIzaSyCMPbs-XBKLb_odiPtzXUY1rt5tV4x8Wbc",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs"
   }
 }

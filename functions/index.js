@@ -27,39 +27,41 @@ exports.text_maintenance_summary = functions.pubsub.schedule('every 2 minutes').
 		spreadsheetId: '1drcYhNrzV9IPNpCUqKCbhdVfr3wlQ-eW8p_zujWRMu0',
 		range: 'routine_time!B1:C2',
 	}, (err, res) => {
-	if (err) return console.log('The API returned an error: ' + err);
-	const rows = res.data.values;
-	console.log(rows);
-	console.log(rows[0]);
-	if (rows.length) {
-	  console_message='Today is ' + rows[0][0] + ' '+ rows[0][1] + '. You have ' + rows[1][1] + ' days left until you are late on plane maintence.';
-	  console.log(console_message);
-	  // Print columns A and E, which correspond to indices 0 and 4.
-	} else {
-	  console.log('No data found.');
-	}
-	});
-	
-	
-	//define the client object for a twilio client
-	const client = require('twilio')(functions.config().twilio_auth.account_sid, functions.config().twilio_auth.auth_token);
+		if (err) return console.log('The API returned an error: ' + err);
+		const rows = res.data.values;
+		//console.log(rows);
+		//console.log(rows[0]);
+		if (rows.length) {
+		  console_message='Today is ' + rows[0][0] + ' '+ rows[0][1] + '. You have ' + rows[1][1] + ' days left until you are late on plane maintence.';
+		  console.log(console_message);
+		  // Print columns A and E, which correspond to indices 0 and 4.
+		} else {
+		  console_message='No data found.';
+		  console.log(console_message);
+		}
 
-	//create a message object
-	client.messages.create(
-	  {
-		to: '+1'+phone,
-		from: '+17176960783', // this is my twilio number
-		body: console_message,  // this the text in the sms message
-	  },
-	  function(err,message){  // if there is a return message from twilio grab it. 
-		  if(err){
-			  console.log(err);  //if there is an error in that message, log it .
-		  }else{
-			  console.log(message.sid);  //  otherwise log the message anyway
+		//define the client object for a twilio client
+		const client = require('twilio')(functions.config().twilio_auth.account_sid, functions.config().twilio_auth.auth_token);
+		//console.log(functions.config().twilio_auth.account_sid);
+		//console.log(functions.config().twilio_auth.auth_token);
+		//create a message object
+		client.messages.create(
+		  {
+			to: '+1'+phone,
+			from: '+17176960783', // this is my twilio number
+			body: console_message,  // this the text in the sms message
+		  },
+		  function(err,message){  // if there is a return message from twilio grab it. 
+			  if(err){
+				  console.log('Twilio error:');
+				  console.log(err);  //if there is an error in that message, log it .
+			  }else{
+				  console.log('Twilio success, returned sid:');
+				  console.log(message.sid);  //  otherwise log the message anyway
+			  }
 		  }
-	  }
-	);
-	
+		);	
+	});
 	return(0);
 });
 
