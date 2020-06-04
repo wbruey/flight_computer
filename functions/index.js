@@ -3,48 +3,16 @@ const admin = require('firebase-admin');
 admin.initializeApp();
 //const request = require('request');
 const language = require('@google-cloud/language');
-const cors = require('cors')({
-  origin: true,
-});
+const cors = require('cors')({origin:true});
 var twilio = require('twilio');
 var http = require('http');
 const MessagingResponse = require('twilio').twiml.MessagingResponse;
 const readline = require('readline');
 const {google} = require('googleapis');
 const request = require('request-promise');
-
-//=======LEARNING ABOUT PROMISES===============
-exports.promise_test = functions.pubsub.schedule('every 60 minutes').onRun((context) => { 
-
-	function fake_grab(text1,text2){
-		functions_promise = new Promise((resolve,reject)=>{
-			if(text1.length && text2.length){
-				resolve(text1 +'   ' +  text2);
-			}else{
-				throw new Error("one of the texts is blank");
-			}
-		});
-		return functions_promise;
-	}
+const nodemailer = require('nodemailer');
 
 
-	const googles_promise = fake_grab('',' breast')  // define the promise
-		.then((text_data) => {     //define what to do next if promise is fulfilled
-			console.log(text_data);
-		})
-		.catch((err)=> {
-			console.log(err);  //define what to do i fthe promise is not fulfilled.
-			console.log('do a top level error thing');
-			
-		});
-
-	setTimeout(()=>console.log('do an adjacent thing'),1000);
-	
-	
-	
-	return 0;
-
-});
 
 //returns a promise to grab spreadsheet data from google API given a spreadsheet ID and a range to grab data from
 function grab_spreadsheet_data(spreadsheetId,range){
@@ -96,10 +64,90 @@ function send_text_message(phone,text_message){
 	return twilios_promise;
 }
 
+//sends an email
+function send_email(to,from,subject,html){
+	const mailOptions = {
+		to:to,
+		from:from,
+		subject:subject,
+		html:html
+	}
+	let transporter = nodemailer.createTransport({
+		service: 'gmail',
+		auth: {
+			user:functions.config().gmail_auth.address,
+			pass:functions.config().gmail_auth.password
+		}
+	});
+	transporter.sendMail(mailOptions,(err, info) => {
+		if(err){
+			console.log('Error sending email to '+ err.toString());
+			throw new Error(err);
+		}else{
+			console.log('Sent an email:  ' + info);
+		}
+	});
+	return 0;
+}
 
+
+
+//=======EMAIL WILL TOTAL MAINTENACE SUMMARY===============
+exports.email_maintenance_summary = functions.pubsub.schedule('every 5 days').onRun((context) => { 
+	
+	//first get the maintenance report
+	const time_spreadsheetId='1drcYhNrzV9IPNpCUqKCbhdVfr3wlQ-eW8p_zujWRMu0';
+	const header_range='routine_time!B1:C2';
+	const time_data_range='routine_time!A7:D';
+	
+	var html='<p>ERROR</p>';
+	var todays_date='error';
+	
+	//get a promise to do the things (grab data and then email) then do them.
+	const promise_grab_maintenance = grab_spreadsheet_data(time_spreadsheetId,header_range)
+		//then format the data from the spreadsheeet to create the message you want to send.  remember, youre passing a function to the .then method slot.
+		.then((rows) =>{
+			console.log('Mainteance data gathered: ' + 'Today is ' + rows[0][0] + ' '+ rows[0][1] + '. You have ' + rows[1][1] + ' days left until you are late on plane maintence.');
+			todays_date=rows[0][1];
+			html=`
+			<h1 style="margin-bottom:0px;"><u>`+rows[1][1]+`</u> Days Left</h1>
+			<h2 style="display:inline;margin-bottom:0px;">`+rows[0][0]+`</h2>
+			<h5 style="display:inline;line-height:0px;margin-top:-5px;">`+rows[0][1]+`</h5>
+			`
+			return grab_spreadsheet_data(time_spreadsheetId,time_data_range);
+		})
+		.then((rows) =>{
+			// sort by date due ... heres how to sort in javascript: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/sort
+			rows.sort((a,b)=>{return a[3]-b[3]});
+			//only take the first three rows (what needs to be maintained in the near term).
+			rows=rows.slice(0,3);
+			html=html+`<p style="line-height:0px"><b>Near-term Mainteance To Occur</b></p>`;
+			
+			
+			
+			if(rows.length){
+				rows.map((row)=>{
+					html=html+`<p style="line-height:0px">${row[0]}:${row[3]} days</p>`;
+				});
+			}else{
+				html=html+`<p>No Future Maintenance Items Found</p>`
+			}
+				
+			const to = 'willbruey@gmail.com';
+			const from = 'Bruey Airlines <airlines@brueyenterprises.com>';
+			const subject ='N171ML Maintenance Report - '+ todays_date;		
+			send_email(to,from,subject,html);
+			
+		})
+		//if there was an error, print it to console.
+		.catch(err=>console.log('Failed to update Will with Maintenance Report:  ' + err));	
+
+	return 0;
+
+});
 
 //=======TEXT WILL TOTAL MAINTENACE SUMMARY===============
-exports.text_maintenance_summary2 = functions.pubsub.schedule('every 60 minutes').onRun((context) => { 
+exports.text_maintenance_summary = functions.pubsub.schedule('every 365 days').onRun((context) => { 
 	
 	//define the spreadsheet to get data from and the phone number to send the text too.
 	const spreadsheetId='1drcYhNrzV9IPNpCUqKCbhdVfr3wlQ-eW8p_zujWRMu0';
@@ -126,59 +174,8 @@ exports.text_maintenance_summary2 = functions.pubsub.schedule('every 60 minutes'
 });
 
 
-//=======TEXT WILL TOTAL MAINTENACE SUMMARY===============
-exports.text_maintenance_summary = functions.pubsub.schedule('every 60 minutes').onRun((context) => { 
-	//define the phone number to send the text too.
-	var phone = '7174756561';
-	var console_message='';
-    //grab the time - based maintence items
-	const sheets = google.sheets({version: 'v4', auth: functions.config().google_auth.api_key});
-	sheets.spreadsheets.values.get({
-		spreadsheetId: '1drcYhNrzV9IPNpCUqKCbhdVfr3wlQ-eW8p_zujWRMu0',
-		range: 'routine_time!B1:C2',
-	}, (err, res) => {
-		if (err) return console.log('The API returned an error: ' + err);
-		const rows = res.data.values;
-		//console.log(rows);
-		//console.log(rows[0]);
-		if (rows.length) {
-		  console_message='Today is ' + rows[0][0] + ' '+ rows[0][1] + '. You have ' + rows[1][1] + ' days left until you are late on plane maintence.';
-		  console.log(console_message);
-		  // Print columns A and E, which correspond to indices 0 and 4.
-		} else {
-		  console_message='No data found.';
-		  console.log(console_message);
-		}
-
-		//define the client object for a twilio client
-		const client = require('twilio')(functions.config().twilio_auth.account_sid, functions.config().twilio_auth.auth_token);
-		//console.log(functions.config().twilio_auth.account_sid);
-		//console.log(functions.config().twilio_auth.auth_token);
-		//create a message object
-		client.messages.create(
-		  {
-			to: '+1'+phone,
-			from: '+17176960783', // this is my twilio number
-			body: console_message,  // this the text in the sms message
-		  },
-		  function(err,message){  // if there is a return message from twilio grab it. 
-			  if(err){
-				  console.log('Twilio error:');
-				  console.log(err);  //if there is an error in that message, log it .
-			  }else{
-				  console.log('Twilio success, returned sid:');
-				  console.log(message.sid);  //  otherwise log the message anyway
-			  }
-		  }
-		);	
-	});
-	return(0);
-});
-
-
-
 //=======get and print user info to console===============
-exports.list_users = functions.pubsub.schedule('every 23 hours').onRun((context) => { 
+exports.list_users = functions.pubsub.schedule('every 1000 days').onRun((context) => { 
 
 	admin.auth().updateUser('cpIxtybEjuYwKGREJFJLWTHhvtZ2', {
 	  phoneNumber: '+17174756561'
@@ -210,14 +207,13 @@ exports.list_users = functions.pubsub.schedule('every 23 hours').onRun((context)
 	}
 	// Start listing users from the beginning, 1000 at a time.
 	listAllUsers();
-
 });
 
 
 //==========GRAB A VALUE from the google spreadsheet and post it to console log. test function =====================================
 
-exports.grab_log_cell = functions.pubsub.schedule('every 23 hours').onRun((context) => { 
 
+exports.grab_log_cell = functions.pubsub.schedule('every 1000 days').onRun((context) => { 
 	//function listMajors(auth) {
 	  const sheets = google.sheets({version: 'v4', auth: functions.config().google_auth.api_key});
 	  sheets.spreadsheets.values.get({
@@ -241,10 +237,15 @@ exports.grab_log_cell = functions.pubsub.schedule('every 23 hours').onRun((conte
 });
 
 
+
+
+
 //===========SEND A TEXT _ TEST FUNCTION======================================================================
 // sends a text per schedule below.
 // define the schedule
-exports.test_text = functions.pubsub.schedule('every 23 hours').onRun((context) => { 
+
+
+exports.test_text = functions.pubsub.schedule('every 1000 days').onRun((context) => { 
 	//define the phone number to send the text too.
 	var phone = '7174756561';
   	
@@ -267,4 +268,43 @@ exports.test_text = functions.pubsub.schedule('every 23 hours').onRun((context) 
 	  }
 	);
 	return(0);
+});
+
+
+
+
+
+//=======LEARNING ABOUT PROMISES===============
+
+
+exports.promise_test = functions.pubsub.schedule('every 1000 days').onRun((context) => { 
+
+	function fake_grab(text1,text2){
+		functions_promise = new Promise((resolve,reject)=>{
+			if(text1.length && text2.length){
+				resolve(text1 +'   ' +  text2);
+			}else{
+				throw new Error("one of the texts is blank");
+			}
+		});
+		return functions_promise;
+	}
+
+
+	const googles_promise = fake_grab('',' breast')  // define the promise
+		.then((text_data) => {     //define what to do next if promise is fulfilled
+			console.log(text_data);
+		})
+		.catch((err)=> {
+			console.log(err);  //define what to do i fthe promise is not fulfilled.
+			console.log('do a top level error thing');
+			
+		});
+
+	setTimeout(()=>console.log('do an adjacent thing'),1000);
+	
+	
+	
+	return 0;
+
 });
