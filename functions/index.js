@@ -84,7 +84,7 @@ function send_email(to,from,subject,html){
 			console.log('Error sending email to '+ err.toString());
 			throw new Error(err);
 		}else{
-			console.log('Sent an email:  ' + info);
+			console.log('Sent an email:  ' + JSON.stringify(info));
 		}
 	});
 	return 0;
@@ -93,11 +93,13 @@ function send_email(to,from,subject,html){
 
 
 //=======EMAIL WILL TOTAL MAINTENACE SUMMARY===============
-exports.email_maintenance_summary = functions.pubsub.schedule('every 2 minutes').onRun((context) => { 
+exports.email_maintenance_summary = functions.pubsub.schedule('every thursday 09:00').onRun((context) => { 
+	
+
 	
 	//first get the maintenance report
 	const spreadsheet='1drcYhNrzV9IPNpCUqKCbhdVfr3wlQ-eW8p_zujWRMu0';
-	const data_ranges=['routine_time!B1:C2','routine_time!A7:D','routine_use!B1:B2','routine_use!A7:D'];
+	const data_ranges=['routine_time!B1:C2','routine_time!A7:D','routine_use!B1:B2','routine_use!A7:D','one_off!A2:D'];
 	
 	var html='<p>ERROR</p>';
 	var todays_date='error';
@@ -111,60 +113,125 @@ exports.email_maintenance_summary = functions.pubsub.schedule('every 2 minutes')
 		//then format the data from the spreadsheeet to create the message you want to send.  remember, youre passing a function to the .then method slot.
 		.then((valueRanges) =>{
 			
-			//first grab the rows from the first (zeroth) data set which has dates
-			dates=valueRanges[0].values;
-			console.log('Mainteance data gathered: ' + 'Today is ' + dates[0][0] + ' '+ dates[0][1] + '. You have ' + dates[1][1] + ' days left until you are late on plane maintence.');
-			todays_date=dates[0][1];
-			days_to_go=dates[1][1];
-			day_of_the_week=dates[0][0];
+			//try to send a valid email, if not send an error email
+			try{
+				//first grab the rows from the first (zeroth) data set which has dates
+				dates=valueRanges[0].values;
+				console.log('Mainteance data gathered: ' + 'Today is ' + dates[0][0] + ' '+ dates[0][1] + '. You have ' + dates[1][1] + ' days left until you are late on plane maintence.');
+				todays_date=dates[0][1];
+				days_to_go=dates[1][1];
+				day_of_the_week=dates[0][0];
 
-			
-			//Next grab the rows from the 2nd data set which has time based maintenace items
-			days=valueRanges[1].values;
-			// sort by date due ... heres how to sort in javascript: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/sort
-			days.sort((a,b)=>{return a[3]-b[3]});
-			days=days.slice(0,3);
+				
+				//Next grab the rows from the 2nd data set which has time based maintenace items
+				days=valueRanges[1].values;
+				// sort by date due ... heres how to sort in javascript: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/sort
+				days.sort((a,b)=>{return a[3]-b[3]});
+				days=days.slice(0,3);
 
 
-			tachs=valueRanges[2].values;
-			//Next grab the rows from the 3rd data set which is plane hour information.
-			todays_tach=tachs[0][0];
-			hours_to_go=tachs[1][0];
-			console.log('Mainteance data gathered: ' + 'Tach is at: ' +todays_tach+ '. You have ' + hours_to_go + ' hours left until you are late on plane maintence.');
-			
-			// finally grab the rows from the 4th data set which is tach hours for maintenance items.
-			hours=valueRanges[3].values;
-			hours.sort((a,b)=>{return a[3]-b[3]});
-			hours=hours.slice(0,3);
-			
-			//print stuff to HTML starting with todays status and headers
-			html=`
-			<h1 style="margin-bottom:0px;"><u>`+days_to_go+`</u> Days Left  &  <u>`+hours_to_go+`</u> Tach Hours Left</h1>
-			<h2 style="display:inline;margin-bottom:0px;">`+day_of_the_week+`</h2>
-			<h5 style="display:inline;line-height:0px;margin-top:-5px;">`+todays_date+`</h5>
-			<table>
-				<tr>
-					<td><b>System</b></td>	 <td></td><td></td><td></td><td></td><td></td><td></td>   <td style="text-align:left"><b>Due</b></td>
-				</tr>
-			`;			
-			
-			//next is to iterate over near term maintenance and put that into the html
-			//first add suffix days or hours
-			days.map((day)=>{day.push('days');day.push(day[3]);});
-			hours.map((hour)=>{hour.push('tach hours');hour.push(String(hour[3]*7));});  //multiply by 7 for hours so that when we sort we equivalent 1 tach hour to 7 days assuming i fly 1 hour per week this is just to look nice on the sort
-			//next concatinate them
-			nearterm_maintenances=days.concat(hours);
-			nearterm_maintenances.sort((a,b)=>{return a[5]-b[5]});
-			nearterm_maintenances.map((nearterm_maintenance)=>{
-				html=html+`<tr><td>${nearterm_maintenance[0]}</td>    <td></td><td></td><td></td><td></td><td></td><td></td>      <td>${nearterm_maintenance[3]} ${nearterm_maintenance[4]}</p>`;
-			});			
-			html=html+'</table>'
-			
-			
-			const to = 'willbruey@gmail.com';
-			const from = 'Bruey Airlines <airlines@brueyenterprises.com>';
-			const subject ='N171ML Maintenance Report - '+ todays_date;		
-			send_email(to,from,subject,html);
+				tachs=valueRanges[2].values;
+				//Next grab the rows from the 3rd data set which is plane hour information.
+				todays_tach=tachs[0][0];
+				hours_to_go=tachs[1][0];
+				console.log('Mainteance data gathered: ' + 'Tach is at: ' +todays_tach+ '. You have ' + hours_to_go + ' hours left until you are late on plane maintence.');
+				
+				// finally grab the rows from the 4th data set which is tach hours for maintenance items.
+				hours=valueRanges[3].values;
+				hours.sort((a,b)=>{return a[3]-b[3]});
+				hours=hours.slice(0,3);
+				
+				//oops one more don't forget to get the high risks
+				risks=valueRanges[4].values;
+				notable_risks=[];
+				risks.map((risk)=>{
+					//console.log(risk);
+					if(risk[1].toUpperCase()==='LOW' || risk[1].toUpperCase()==='PERFORMANCE'|| risk[2].toUpperCase()==='FIXED'|| risk[3].toUpperCase()==='FIXED'){
+						trash=3; // do nothing
+					}else{
+						notable_risks.push(risk);
+					}
+				});
+				
+				//print stuff to HTML starting with todays status and headers
+				html=`
+				<h1 style="margin-bottom:0px;"><u>`+days_to_go+`</u> Days Left  &  <u>`+hours_to_go+`</u> Tach Hours Left</h1>
+				<h2 style="display:inline;margin-bottom:0px;">`+day_of_the_week+`</h2>
+				<h5 style="display:inline;line-height:0px;margin-top:-5px;">`+todays_date+`</h5>`
+				
+				//then print the high risks
+				html=html+`
+					<table style="border:1px solid black">
+					<tr><td><b>Medium to High Perceived System Risks</b></td>	 <td></td><td></td><td></td><td></td><td></td><td></td>   <td style="text-align:left"><b>Magnitude</b></td> </tr>
+				`
+				//iterate over the notable risks
+				notable_risks.map((notable_risk)=>{
+					html=html+`<tr><td>${notable_risk[0]}</td>    <td></td><td></td><td></td><td></td><td></td><td></td>      <td>${notable_risk[1]}</p>`;
+				});				
+				html=html+'</table>';
+
+				// then print the rountine maintenance.	
+				html=html+`<p></p><table style="border:1px solid black">
+					<tr>
+						<td><b>Upcomin System Maintenance</b></td>	 <td></td><td></td><td></td><td></td><td></td><td></td>   <td style="text-align:left"><b>Due</b></td>
+					</tr>
+				`;			
+				//iterate over near term maintenance and put that into the html
+				//first add suffix days or hours
+				days.map((day)=>{day.push('days');day.push(day[3]);});
+				hours.map((hour)=>{hour.push('tach hours');hour.push(String(hour[3]*7));});  //multiply by 7 for hours so that when we sort we equivalent 1 tach hour to 7 days assuming i fly 1 hour per week this is just to look nice on the sort
+				//next concatinate them
+				nearterm_maintenances=days.concat(hours);
+				nearterm_maintenances.sort((a,b)=>{return a[5]-b[5]});
+				nearterm_maintenances.map((nearterm_maintenance)=>{
+					html=html+`<tr><td>${nearterm_maintenance[0]}</td>    <td></td><td></td><td></td><td></td><td></td><td></td>      <td>${nearterm_maintenance[3]} ${nearterm_maintenance[4]}</p>`;
+				});			
+				html=html+'</table>'
+				
+				//send an email to all the subscribers
+				//get a list of subscribers to maintenace report
+				var db = admin.database();
+				var ref = db.ref('/maintenance_subscribers');
+				ref.on("value", function(snapshot) {
+					maintenance_subscribers=snapshot.val();
+					//console.log(maintenance_subscribers);
+					send_emails(maintenance_subscribers);
+				}, function (errorObject) { 
+					console.log("The read failed: " + errorObject.code);
+				});	
+				
+				//grab their email addresses and email them
+				//first get a list of user ids per https://firebase.google.com/docs/auth/admin/manage-users
+				function send_emails(maintenance_subscribers){
+					uids=[];
+					for(var subscriber in maintenance_subscribers){
+						uids.push({uid: subscriber});
+					}
+					//grab those users email addresses:
+					admin.auth().getUsers(uids)
+						//its a promise because we are waiting
+						.then(function(getUsersResult){
+							//once those user profiles are grabbed, do a function (email) for each user
+							getUsersResult.users.forEach((userRecord)=>{
+								//console.log(userRecord);
+								to=userRecord.email;
+								console.log('sending email to: '+to);
+								from = 'Bruey Airlines <airlines@brueyenterprises.com>';
+								subject ='N171ML Maintenance Report - '+ todays_date;	
+								send_email(to,from,subject,html);
+							});
+						})
+						.catch(err=>console.log('Failed to deciefer user emails from the firebase database: '+err));
+				}	
+
+
+			}catch(err){
+				console.log('Failed to build maintenace email, sent error email instead: '+err);
+				to = 'willbruey@gmail.com';
+				from = 'Bruey Airlines <airlines@brueyenterprises.com>';
+				subject ='N171ML Maintenance Report - '+ todays_date;		
+				send_email(to,from,subject,'<p>ERROR</p>');
+			}
 			
 		})
 		//if there was an error, print it to console.
