@@ -14,6 +14,7 @@ const nodemailer = require('nodemailer');
 const N1717ML_maintenance_spreadsheet_id='1drcYhNrzV9IPNpCUqKCbhdVfr3wlQ-eW8p_zujWRMu0';
 const N1717ML_maintenance_data_ranges=['routine_time!B1:C2','routine_time!A7:D','routine_use!B1:B2','routine_use!A7:D','one_off!A2:D'];
 const db_location_of_maintenace_subscribers='/maintenance_subscribers';
+const db_location_of_reports='/reports';
 
 
 //===================Global Variables====================================
@@ -169,6 +170,26 @@ function get_database_tranche(database_path){
 	return firebases_promise;
 }
 
+//==========Function: write (*Update*) data to firebase   =========================
+//INPUT: a string of the path of the database tranche you want as your root for example: , and a key-value json object with updates for example {"will/email":"willbruey@gmail.com","paul/email":"pbruey@wellspan.com"}
+//OUTPUT:  a PROMISE to write to the database resolved to success message when complete.
+function update_database(database_path,updates_object){
+	const firebases_promise = new Promise((resolve,reject)=>{ //create the promise 
+		var ref = db.ref(database_path);  //create the database reference object
+		ref.update(updates_object,err=>{
+			if(err){
+				console.log('ERROR, unable to update firebase database: '+err);
+			}else{
+				console.log('Successfully updated firebase database');
+				resolve('success');
+			}
+		});
+	});
+	return firebases_promise;
+}
+
+
+
 //==========Function: Get a list of user_ids from a database tranche of type "subscription" ... i made up this type ... basically its a database tranche that is structure like per the link at the end of this line, it is good to structure members of a chat or subscription list like this in the database {subscription_name : {user_name1:'1',user_name2:'0',user_name3:'1'...}}  https://firebase.google.com/docs/database/web/structure-data
 //INPUT: a database tranche of type "subscribers" represented as a key-value-json-object  : {user_name1:'1',user_name2:'0',user_name3:'1'...}    
 //OUTPUT: a list of user ids ['uid1','uid2',....
@@ -288,15 +309,13 @@ function send_bulk_emails(destination_addresses,subject,html){
 
 //}  =====================end of helper functions=========================================
 
-//====================FIREBASE CLOUD FUNCTIONS===============
+//{====================FIREBASE CLOUD FUNCTIONS===============
 
 //=======Firebase Cloud Function: Email Maintenance Summary Report to Subscribers Every Thurs at 9am eastern===============
+
 exports.email_maintenance_summary = functions.pubsub.schedule('every thursday 09:00').onRun((context) => { 
 //exports.email_maintenance_summary = functions.pubsub.schedule('every 2 minutes').onRun((context) => { 
-	
-	// initialize firebase admin and the database object
-	//admin.initializeApp();
-	//var db = admin.database();
+//this function emails out the maintenance report each thurs morning at 9am.
 	
 	//first get a promise for the appropriate maintenance data from the 171ml maintenance spreadsheet via the google sheet api
 	const promise_grab_maintenance = grab_batch_spreadsheet_data(N1717ML_maintenance_spreadsheet_id,N1717ML_maintenance_data_ranges)
@@ -319,14 +338,38 @@ exports.email_maintenance_summary = functions.pubsub.schedule('every thursday 09
 		.catch((err)=>{
 			console.log('Error, unable to gather, format, and send maintenace report:  '+err)
 			to = 'willbruey@gmail.com';
-			from = 'Bruey Airlines <airlines@brueyenterprises.com>';
 			subject ='ERROR - N171ML Maintenance Report';		
-			send_email(to,from,subject,'<p>Error, unable to gather, format, and send maintenace report!  Check Firebase Logs</p>');
+			send_email(to,subject,'<p>Error, unable to gather, format, and email out maintenace report!  Check Firebase Logs</p>');
 		});
 		
 	return 0;
 
 });
+
+
+//=======Firebase Cloud Function: Write Maintenance Summary Report HTML to Database Every Day===============
+exports.email_maintenance_summary = functions.pubsub.schedule('every day 05:00').onRun((context) => { 	
+//exports.save_maintenance_summary_html_to_db = functions.pubsub.schedule('every 2 minutes').onRun((context) => { 
+//this function gathers the maintenance data, formats to html and writes it to the database so that a website can pull from it.
+	
+	//first get a promise for the appropriate maintenance data from the 171ml maintenance spreadsheet via the google sheet api
+	const promise_grab_maintenance = grab_batch_spreadsheet_data(N1717ML_maintenance_spreadsheet_id,N1717ML_maintenance_data_ranges)
+		//then format the data from the spreadsheeet to create the message you want to send.  remember, youre passing a function to the .then method slot.
+		.then((valueRanges) =>{
+			maintenance_summary=format_N1717ML_data(valueRanges);
+			return(update_database(db_location_of_reports,{"maintenance_summary_html":maintenance_summary.report_html}));}
+		).then((response_string)=>{
+			console.log(response_string);
+		})
+		.catch((err)=>{
+			console.log('Error, unable to update firebase database with html of maintenace report:  '+err)
+			to = 'willbruey@gmail.com';
+			from = 'Bruey Airlines <airlines@brueyenterprises.com>';
+			subject ='ERROR - N171ML Maintenance Report';	
+			send_email(to,subject,'<p>Error, unable to gather, format, and update firebase with the html of the maintenace report!  Check Firebase Logs</p>');			
+		});			
+	return 0;
+});  
 
 
 //=======TEXT WILL TOTAL MAINTENACE SUMMARY===============
@@ -395,7 +438,6 @@ exports.list_users = functions.pubsub.schedule('every 23 hours').onRun((context)
 
 //==========GRAB A VALUE from the google spreadsheet and post it to console log. test function =====================================
 exports.grab_log_cell = functions.pubsub.schedule('every 23 hours').onRun((context) => { 
-	//function listMajors(auth) {
 	  const sheets = google.sheets({version: 'v4', auth: functions.config().google_auth.api_key});
 	  sheets.spreadsheets.values.get({
 		spreadsheetId: '1drcYhNrzV9IPNpCUqKCbhdVfr3wlQ-eW8p_zujWRMu0',
@@ -413,7 +455,6 @@ exports.grab_log_cell = functions.pubsub.schedule('every 23 hours').onRun((conte
 		  console.log('No data found.');
 		}
 	  });
-	//}
 	return(0);
 });
 
@@ -450,6 +491,7 @@ exports.test_text = functions.pubsub.schedule('every 23 hours').onRun((context) 
 //=======LEARNING ABOUT PROMISES===============
 exports.promise_test = functions.pubsub.schedule('every 23 hours').onRun((context) => { 
 
+
 	function fake_grab(text1,text2){
 		functions_promise = new Promise((resolve,reject)=>{
 			if(text1.length && text2.length){
@@ -479,3 +521,5 @@ exports.promise_test = functions.pubsub.schedule('every 23 hours').onRun((contex
 	return 0;
 
 });
+
+//}=====================end of FIREBASE CLOUD functions=========================================
