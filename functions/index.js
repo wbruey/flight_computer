@@ -348,7 +348,7 @@ exports.email_maintenance_summary = functions.pubsub.schedule('every thursday 09
 
 
 //=======Firebase Cloud Function: Write Maintenance Summary Report HTML to Database Every Day===============
-exports.email_maintenance_summary = functions.pubsub.schedule('every day 05:00').onRun((context) => { 	
+exports.store_maintenance_summary = functions.pubsub.schedule('every day 05:00').onRun((context) => { 	
 //exports.save_maintenance_summary_html_to_db = functions.pubsub.schedule('every 2 minutes').onRun((context) => { 
 //this function gathers the maintenance data, formats to html and writes it to the database so that a website can pull from it.
 	
