@@ -316,20 +316,28 @@ function send_bulk_emails(destination_addresses,subject,html){
 
 exports.write_tlm_to_db = functions.https.onRequest((req, res) => {
 
+		console.log(typeof(req.body));
+
 		//grab telem frame
-        var original = req.body;
-		console.log(original);
-		console.log('test!');
-		functions.logger.log("Hello from info. Here's an object:", original);
+        //var tlm_frame = JSON.parse(req.body);
+		var tlm_frame = req.body;
+		
+		//console.log(tlm_frame);
+		//functions.logger.log("Hello from info. Here's an object:", tlm_frame);
 		//functions.logger.log("Hello from info. Here's an object:", original);
 		
+		//console.log(typof(tlm_frame))
+		console.log(tlm_frame);
 		//determine the session_id for this tlm frame
+		session_id=String(tlm_frame['session_id']);
+		console.log(session_id);
 		
-		//get the timestamp for this tlm frame
+		//get the timestamp for this tlm frame and round to the second because like, who cares.
+		tlm_frame_key=String(Math.floor(Number(tlm_frame['time'])));
+		console.log(tlm_frame_key);		
 		
 		
-		x={'fest':'breast','meow':'cow'}
-		const firebase_promise_write_data=update_database('/telemetry/test',original)
+		const firebase_promise_write_data=update_database('/telemetry/'+session_id+'/'+tlm_frame_key,tlm_frame)
 		.then((db_response)=>{
 			console.log(db_response);
 			return res.sendStatus(200);
