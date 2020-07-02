@@ -15,6 +15,7 @@ const N1717ML_maintenance_spreadsheet_id='1drcYhNrzV9IPNpCUqKCbhdVfr3wlQ-eW8p_zu
 const N1717ML_maintenance_data_ranges=['routine_time!B1:C2','routine_time!A7:D','routine_use!B1:B2','routine_use!A7:D','one_off!A2:D'];
 const db_location_of_maintenace_subscribers='/maintenance_subscribers';
 const db_location_of_reports='/reports';
+const axios = require('axios');
 
 
 //===================Global Variables====================================
@@ -241,7 +242,7 @@ function get_emails_of_users(list_of_uids){
 
 
 //===========Function: Send a Text Message =====================================
-//INPUT: send_text_message(phone,text_message)........ example:('7174756561','hello there')
+/* //INPUT: send_text_message(phone,text_message)........ example:('7174756561','hello there')
 //OUTPUT: a response from twillo that resolves as either a sent receipt from twillo or an error.
 function send_text_message(phone,text_message){
 	//construct the promise to return
@@ -265,7 +266,7 @@ function send_text_message(phone,text_message){
 		);	
 	});
 	return twilios_promise;
-}
+} */
 
 //===========Function: Send Email From Bruey Airlines (Low throughput)==========================
 // INPUT: send_email(to,subject,html) to address, subject, html   .... example ('willbruey@gmail.com','this is a subject line',<h1> Hello! </h1>)
@@ -310,6 +311,35 @@ function send_bulk_emails(destination_addresses,subject,html){
 //}  =====================end of helper functions=========================================
 
 //{====================FIREBASE CLOUD FUNCTIONS===============
+
+//Takes a telemetry transmitted from flight computer and writes it to the database
+
+exports.write_tlm_to_db = functions.https.onRequest((req, res) => {
+
+		//grab telem frame
+        var original = req.body;
+		console.log(original);
+		console.log('test!');
+		functions.logger.log("Hello from info. Here's an object:", original);
+		//functions.logger.log("Hello from info. Here's an object:", original);
+		
+		//determine the session_id for this tlm frame
+		
+		//get the timestamp for this tlm frame
+		
+		
+		x={'fest':'breast','meow':'cow'}
+		const firebase_promise_write_data=update_database('/telemetry/test',original)
+		.then((db_response)=>{
+			console.log(db_response);
+			return res.sendStatus(200);
+		})
+		
+		
+	
+});
+//}
+
 
 //=======Firebase Cloud Function: Email Maintenance Summary Report to Subscribers Every Thurs at 9am eastern===============
 
@@ -373,7 +403,7 @@ exports.store_maintenance_summary = functions.pubsub.schedule('every day 05:00')
 
 
 //=======TEXT WILL TOTAL MAINTENACE SUMMARY===============
-exports.text_maintenance_summary = functions.pubsub.schedule('every 23 hours').onRun((context) => { 
+/* exports.text_maintenance_summary = functions.pubsub.schedule('every 23 hours').onRun((context) => { 
 	
 	//define the spreadsheet to get data from and the phone number to send the text too.
 	const spreadsheetId='1drcYhNrzV9IPNpCUqKCbhdVfr3wlQ-eW8p_zujWRMu0';
@@ -398,10 +428,10 @@ exports.text_maintenance_summary = functions.pubsub.schedule('every 23 hours').o
 	// make highest level firebase function happy
 	return 0;
 });
-
+ */
 
 //=======get and print user info to console===============
-exports.list_users = functions.pubsub.schedule('every 23 hours').onRun((context) => { 
+/* exports.list_users = functions.pubsub.schedule('every 23 hours').onRun((context) => { 
 
 	admin.auth().updateUser('cpIxtybEjuYwKGREJFJLWTHhvtZ2', {
 	  phoneNumber: '+17174756561'
@@ -433,11 +463,11 @@ exports.list_users = functions.pubsub.schedule('every 23 hours').onRun((context)
 	}
 	// Start listing users from the beginning, 1000 at a time.
 	listAllUsers();
-});
+}); */
 
 
 //==========GRAB A VALUE from the google spreadsheet and post it to console log. test function =====================================
-exports.grab_log_cell = functions.pubsub.schedule('every 23 hours').onRun((context) => { 
+/* exports.grab_log_cell = functions.pubsub.schedule('every 23 hours').onRun((context) => { 
 	  const sheets = google.sheets({version: 'v4', auth: functions.config().google_auth.api_key});
 	  sheets.spreadsheets.values.get({
 		spreadsheetId: '1drcYhNrzV9IPNpCUqKCbhdVfr3wlQ-eW8p_zujWRMu0',
@@ -457,10 +487,10 @@ exports.grab_log_cell = functions.pubsub.schedule('every 23 hours').onRun((conte
 	  });
 	return(0);
 });
-
+ */
 
 //===========SEND A TEXT _ TEST FUNCTION======================================================================
-// sends a text per schedule below.
+/* // sends a text per schedule below.
 // define the schedule
 exports.test_text = functions.pubsub.schedule('every 23 hours').onRun((context) => { 
 	//define the phone number to send the text too.
@@ -486,10 +516,10 @@ exports.test_text = functions.pubsub.schedule('every 23 hours').onRun((context) 
 	);
 	return(0);
 });
-
+ */
 
 //=======LEARNING ABOUT PROMISES===============
-exports.promise_test = functions.pubsub.schedule('every 23 hours').onRun((context) => { 
+/* exports.promise_test = functions.pubsub.schedule('every 23 hours').onRun((context) => { 
 
 
 	function fake_grab(text1,text2){
@@ -520,6 +550,6 @@ exports.promise_test = functions.pubsub.schedule('every 23 hours').onRun((contex
 	
 	return 0;
 
-});
+}); */
 
 //}=====================end of FIREBASE CLOUD functions=========================================
