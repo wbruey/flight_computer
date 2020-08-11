@@ -1,8 +1,13 @@
 //====================INCLUDE DEPENDENCIES============================
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+//const spawn = require('child-process-promise').spawn;
+const path = require('path');
+const os = require('os');
+const fs = require('fs');
 //const request = require('request');
 const language = require('@google-cloud/language');
+const {Storage} = require('@google-cloud/storage');
 const cors = require('cors')({origin:true});
 var twilio = require('twilio');
 var http = require('http');
@@ -17,6 +22,7 @@ const db_location_of_maintenace_subscribers='/maintenance_subscribers';
 const db_location_of_reports='/reports';
 const axios = require('axios');
 const db_location_of_maintenance_summary='/reports/maintenance_summary_html'
+const csv = require('csv-parser');
 
 
 //===================Global Variables====================================
@@ -316,6 +322,44 @@ function send_bulk_emails(destination_addresses,subject,html){
 //}  =====================end of helper functions=========================================
 
 //{====================FIREBASE CLOUD FUNCTIONS===============
+
+//upload a test file to firebase cloud storage.
+exports.csv_to_json_db = functions.pubsub.schedule('every thursday 09:00').onRun((context) => { 
+
+	//admin.initializeApp({
+	//	storageBucket: "flightcomputer-2c62d.appspot.com"
+	//});
+	
+	// Creates a client
+	
+	//const fileBucket = admin.storage().bucket();
+	const filePath= '03-Jul-2020_10_17_29.csv'
+	const tempFilePath = path.join(os.tmpdir(), '03-Jul-2020_10_17_29.csv');
+	const bucket =admin.storage().bucket();
+	var results = [];
+   	const download_promise = new Promise((resolve,reject)=>{
+		//resolve('fest');
+		resolve(bucket.file(filePath).download({destination: tempFilePath}));
+	}).then((bucket_response)=>{
+		console.log(bucket_response);
+		fs.createReadStream(tempFilePath)
+			.pipe(csv())
+			.on('data',(data)=>{results.push(data);})
+			.on('end',()=>{console.log(results);});		
+	});
+	//console.log('Image downloaded locally to', tempFilePath);
+	
+	//var results = [];
+	//fs.createReadStream(tempFilePath)
+	//	.pipe(csv())
+	//	.on('data',(data)=>results.push(data))
+	//	.on('end',()=>console.log(results);
+
+	
+	return 0;
+});
+
+
 
 //Takes a telemetry transmitted from flight computer and writes it to the database
 
