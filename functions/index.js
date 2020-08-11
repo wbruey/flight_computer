@@ -16,6 +16,7 @@ const N1717ML_maintenance_data_ranges=['routine_time!B1:C2','routine_time!A7:D',
 const db_location_of_maintenace_subscribers='/maintenance_subscribers';
 const db_location_of_reports='/reports';
 const axios = require('axios');
+const db_location_of_maintenance_summary='/reports/maintenance_summary_html'
 
 
 //===================Global Variables====================================
@@ -84,9 +85,11 @@ function format_N1717ML_data(valueRanges){
 	
 	//{Next grab the rows from the 2nd data set which has time based maintenace items
 	days=valueRanges[1].values;
+	//console.log(days)
 	// sort by date due ... heres how to sort in javascript: https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/sort
 	days.sort((a,b)=>{return a[3]-b[3]});
 	days=days.slice(0,3);  //only keep the top 3
+	
 	//}
 
 	//{Next grab the rows from the 3rd data set which is plane hour information.
@@ -98,6 +101,7 @@ function format_N1717ML_data(valueRanges){
 	
 	//{ finally grab the rows from the 4th data set which is tach hours for maintenance items.
 	hours=valueRanges[3].values;
+	//console.log(hours)
 	hours.sort((a,b)=>{return a[3]-b[3]});
 	hours=hours.slice(0,3);  //only keep the top 3
 	//}
@@ -107,6 +111,7 @@ function format_N1717ML_data(valueRanges){
 	maintenance_summary_object.notable_risks=[];
 	risks.map((risk)=>{
 		//console.log(risk);
+		console.log(risk[1]+ ' ... ' + risk[2]+ ' ... ' + risk[3]+ ' ... ')
 		if(risk[1].toUpperCase()==='LOW' || risk[1].toUpperCase()==='PERFORMANCE'|| risk[2].toUpperCase()==='FIXED'|| risk[3].toUpperCase()==='FIXED'){
 			trash=3; // do nothing
 		}else{
@@ -394,6 +399,7 @@ exports.store_maintenance_summary = functions.pubsub.schedule('every day 05:00')
 	const promise_grab_maintenance = grab_batch_spreadsheet_data(N1717ML_maintenance_spreadsheet_id,N1717ML_maintenance_data_ranges)
 		//then format the data from the spreadsheeet to create the message you want to send.  remember, youre passing a function to the .then method slot.
 		.then((valueRanges) =>{
+			//console.log(valueRanges)
 			maintenance_summary=format_N1717ML_data(valueRanges);
 			return(update_database(db_location_of_reports,{"maintenance_summary_html":maintenance_summary.report_html}));}
 		).then((response_string)=>{
