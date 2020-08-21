@@ -1,0 +1,22 @@
+{
+  "google_auth": {
+    "client_id": "576511393513-mh3cub6ofq0okk85nvglibg0l1d4imgh.apps.googleusercontent.com",
+    "api_key": "AIzaSyDJ9o9vQBbmuLxghNcsBLixD1evWnQw0Q8",
+    "client_secret": "0VgqSdmNwwMmu48fhNdUMczQ",
+    "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+    "project_id": "flightcomputer-2c62d",
+    "redirect_uris": "[urn:ietf:wg:oauth:2.0:oob,http://localhost]",
+    "auth_uri": "https://accounts.google.com/o/oauth2/auth"
+  },
+  "twilio_auth": {
+    "account_sid": "AC0ffe354bb1064b240f2c38ae8eef3744",
+    "auth_token": "abb0f8aa6131c287bbc50675a700bb9c"
+  },
+  "gmail_auth": {
+    "address": "airlines@brueyenterprises.com",
+    "password": "aAdultWill35"
+  },
+  "google_aut": {
+    "api_key": "AIzaSyDJ9o9vQBbmuLxghNcsBLixD1evWnQw0Q8"
+  }
+}

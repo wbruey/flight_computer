@@ -18,11 +18,13 @@ const request = require('request-promise');
 const nodemailer = require('nodemailer');
 const N1717ML_maintenance_spreadsheet_id='1drcYhNrzV9IPNpCUqKCbhdVfr3wlQ-eW8p_zujWRMu0';
 const N1717ML_maintenance_data_ranges=['routine_time!B1:C2','routine_time!A7:D','routine_use!B1:B2','routine_use!A7:D','one_off!A2:D'];
+const tach_range='routine_use!B1'
 const db_location_of_maintenace_subscribers='/maintenance_subscribers';
 const db_location_of_reports='/reports';
 const axios = require('axios');
 const db_location_of_maintenance_summary='/reports/maintenance_summary_html'
 const csv = require('csv-parser');
+
 
 
 //===================Global Variables====================================
@@ -31,6 +33,43 @@ var db = admin.database();
 
 //{===================HELPER FUNCTIONS=====================================
 
+//simple delay
+/* function wait_bro(seconds){
+	const wait_promise = new Promise((resolve,reject)=>{
+		console.log('start');
+		//resolve('fest');
+		setTimeout(resolve('fest'),seconds*1000);		
+	});
+	return wait_promise;
+}
+ */
+
+//update a google sheets range (range of data like B2:C5)  this function is not for doing multiple ranges. 
+function update_spreadsheet_range(spreadsheetId,range,content){
+	const values=[[content]];
+	const resource={
+		values,
+	};
+
+	//construct the promise to return 
+	const googles_promise = new Promise((resolve,reject)=>{
+ 		const sheets = google.sheets({version: 'v4', auth: functions.config().google_auth.api_key});  //create a google sheets object interface object with my api key
+		sheets.spreadsheets.values.update({
+			spreadsheetId:spreadsheetId,
+			range:range,
+			valueInputOption:'RAW',
+			resource:resource,
+		}, (err, result) =>{
+			if (err){
+				console.log(err);
+			}else{
+				resolve(result);
+			}
+		}); 
+	});
+	
+	return googles_promise;
+}
 
 //===========Function: Batch Grab Data of a list of ranges in a google sheet. ======================
 //INPUT: grab_batch_spreadsheet_data(spreadsheetId,ranges) ....... example:('lajdsfj54lkj56' , ['A1:B3', 'D3':F5, ... etc ] )
@@ -323,6 +362,96 @@ function send_bulk_emails(destination_addresses,subject,html){
 
 //{====================FIREBASE CLOUD FUNCTIONS===============
 
+//gets tach and hobbs from incoming telem data and stores it to firebase.
+exports.grab_tach_and_hobbs = functions.storage.object().onFinalize(async (object) => {
+	const fileBucket = object.bucket; // The Storage bucket that contains the file.
+	const filePath = object.name; // File path in the bucket.
+	console.log(filePath);
+	const contentType = object.contentType; // File content type.
+	const metageneration = object.metageneration; // Number of times metadata has been generated. New objects have a value of 1.
+	// Exit if this is triggered on a file that is not an image.
+	console.log(contentType);
+	//if (!contentType.startsWith('flight_telem/')) {
+	//  return console.log('This is not a flight telem file.');
+	//}
+	// Get the file name.
+	const fileName = path.basename(filePath);
+	
+	const tempFilePath = path.join(os.tmpdir(), fileName);
+	const metadata = {
+	  contentType: contentType,
+	};	
+	const bucket = admin.storage().bucket(fileBucket);
+	await bucket.file(filePath).download({destination: tempFilePath});
+ 	console.log('Telem file downloaded locally to', tempFilePath);
+	const tlm_rows = [];
+	fs.createReadStream(tempFilePath)
+	.pipe(csv())
+	.on('data',(data)=>tlm_rows.push(data))
+	.on('end',()=>{
+		//console.log(tlm_rows);
+		//console.log(typeof tlm_rows);
+		//find the max tach of the table.
+		get_database_tranche(db_location_of_reports+'/current_tach_time')
+		.then((current_tach_time)=>{
+			current_tach_time=Number(current_tach_time);
+			console.log('BEFORE receiving this tlm file the tach time in the realtime database was: '+ current_tach_time.toString());
+			tlm_rows.forEach(row=>{
+				tlm_tach_time=Number(row['tach_time']);
+				if(tlm_tach_time>current_tach_time){
+					current_tach_time=tlm_tach_time;
+				}
+			});
+			console.log('AFTER receiving this tlm file the tach time in the realtime will be set to: '+ current_tach_time.toString());
+			return(update_database(db_location_of_reports,{"current_tach_time":current_tach_time}));
+		})
+		
+		
+//this shit below is intended to update my tach cell in my maintenance spreadsheet, however, i dont want to bother with the whole OATUH thing which i dont even know will work since its for human logins
+//therefore, i wrote a google app script and bound it to the maintenance spreadsheet, which is effectively writing your own "excel function" which grabs the tach from the firebase database. 
+/* 		.then((db_response)=>{
+			console.log(db_response);
+			return(get_database_tranche(db_location_of_reports+'/current_tach_time'));
+		})
+		.then((current_tach_time)=>{
+			return(update_spreadsheet_range(N1717ML_maintenance_spreadsheet_id,tach_range,current_tach_time));			
+		})
+		.then((result)=>{
+			console.log('updated the maintenance spreadsheet with the new tach time');
+			console.log(result.updatedCells);
+			return 0;
+		}); */
+		
+		//now just run the same code as store_maintance_summary, so that it is all fresh and up to date. 
+		// nah not gonna do that either cause of this shit delay, im going to just have my html update script run every minute
+/* 		.then((db_response)=>{
+			console.log(db_response);
+			console.log('start wait');
+			return(wait_bro(90));
+		})
+		.then((trash)=>{
+			console.log('end wait');
+			return(grab_batch_spreadsheet_data(N1717ML_maintenance_spreadsheet_id,N1717ML_maintenance_data_ranges));
+		})
+		.then((valueRanges) =>{
+			//console.log(valueRanges)
+			maintenance_summary=format_N1717ML_data(valueRanges);
+			return(update_database(db_location_of_reports,{"maintenance_summary_html":maintenance_summary.report_html}));} */
+			
+			
+		.then((db_response)=>{
+			console.log(db_response);
+			return 0;
+		});
+	});		
+});
+
+
+
+
+
+/* 
+
 //upload a test file to firebase cloud storage.
 exports.csv_to_json_db = functions.pubsub.schedule('every thursday 09:00').onRun((context) => { 
 
@@ -359,7 +488,7 @@ exports.csv_to_json_db = functions.pubsub.schedule('every thursday 09:00').onRun
 	return 0;
 });
 
-
+ */
 
 //Takes a telemetry transmitted from flight computer and writes it to the database
 
@@ -435,7 +564,7 @@ exports.email_maintenance_summary = functions.pubsub.schedule('every thursday 09
 
 
 //=======Firebase Cloud Function: Write Maintenance Summary Report HTML to Database Every Day===============
-exports.store_maintenance_summary = functions.pubsub.schedule('every day 05:00').onRun((context) => { 	
+exports.store_maintenance_summary = functions.pubsub.schedule('every 2 minutes').onRun((context) => { 	
 //exports.save_maintenance_summary_html_to_db = functions.pubsub.schedule('every 2 minutes').onRun((context) => { 
 //this function gathers the maintenance data, formats to html and writes it to the database so that a website can pull from it.
 	
