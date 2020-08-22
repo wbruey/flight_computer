@@ -17,7 +17,7 @@ const {google} = require('googleapis');
 const request = require('request-promise');
 const nodemailer = require('nodemailer');
 const N1717ML_maintenance_spreadsheet_id='1drcYhNrzV9IPNpCUqKCbhdVfr3wlQ-eW8p_zujWRMu0';
-const N1717ML_maintenance_data_ranges=['routine_time!B1:C2','routine_time!A7:D','routine_use!B1:B3','routine_use!A7:D','one_off!A2:D','log_entries!A1:D'];
+const N1717ML_maintenance_data_ranges=['routine_time!B1:C3','routine_time!A7:D','routine_use!B1:B3','routine_use!A7:D','one_off!A2:D','log_entries!A1:D'];
 const tach_range='routine_use!B1'
 const db_location_of_maintenace_subscribers='/maintenance_subscribers';
 const db_location_of_reports='/reports';
@@ -121,7 +121,8 @@ function format_N1717ML_data(valueRanges){
 		todays_hobbs:'error',
 		last_log_date: 'error',
 		last_log_tach: 'error',
-		last_log_entry:'error'
+		last_log_entry:'error',
+		last_time_flown:'error'
 	}
 
     //{first grab the rows from the first (zeroth) data set which has dates
@@ -130,6 +131,7 @@ function format_N1717ML_data(valueRanges){
 	maintenance_summary_object.todays_date=dates[0][1];
 	maintenance_summary_object.days_to_go=dates[1][1];
 	maintenance_summary_object.day_of_the_week=dates[0][0];
+	maintenance_summary_object.last_time_flown=dates[2][1];
 	//}
 	
 	//{Next grab the rows from the 2nd data set which has time based maintenace items
@@ -217,7 +219,8 @@ function format_N1717ML_data(valueRanges){
 	maintenance_summary_object.report_html=maintenance_summary_object.report_html+'</table>'	
 	maintenance_summary_object.report_html=maintenance_summary_object.report_html+`
 	<h2 style="display:inline;margin-bottom:0px;">Tach Time: `+maintenance_summary_object.todays_tach+`   Hobbs Time: `+maintenance_summary_object.todays_hobbs+`</h2>
-	<p> Latest maintenance done was on `+ maintenance_summary_object.last_log_date+ ` with ` + maintenance_summary_object.last_log_tach + ` hours:  `+  maintenance_summary_object.last_log_entry +`<p>`
+	<p> Latest maintenance done was on `+ maintenance_summary_object.last_log_date+ ` with ` + maintenance_summary_object.last_log_tach + ` hours:  `+  maintenance_summary_object.last_log_entry +`</p>
+	<p> Last time flown: `+maintenance_summary_object.last_time_flown+`</p>`
 	
 
 	
@@ -385,9 +388,25 @@ function send_bulk_emails(destination_addresses,subject,html){
 //{====================FIREBASE CLOUD FUNCTIONS===============
 
 //when the webhook is triggered, the oil tach time is updated.
-/* exports.update_oil_tach = functions.https.onRequest((req, res) => {
+exports.update_oil_tach = functions.https.onRequest((req, res) => {
+		
+	get_database_tranche(db_location_of_reports+'/current_tach_time')
+	.then((current_tach_time)=>{
+		return(update_database(db_location_of_reports,{"last_oil_tach":current_tach_time}));	
+	})
+	.then((trash)=>{
+		return(get_database_tranche(db_location_of_reports+'/current_hobbs_time'));
+	})
+	.then((current_hobbs_time)=>{
+		return(update_database(db_location_of_reports,{"last_oil_hobbs":current_hobbs_time}));	
+	})
+	.then((db_response)=>{
+		console.log(db_response);
+		return res.sendStatus(200);
+	});
 	
-}); */
+	
+}); 
 
 
 //gets tach and hobbs from incoming telem data and stores it to firebase.
