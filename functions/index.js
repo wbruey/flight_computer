@@ -17,7 +17,7 @@ const {google} = require('googleapis');
 const request = require('request-promise');
 const nodemailer = require('nodemailer');
 const N1717ML_maintenance_spreadsheet_id='1drcYhNrzV9IPNpCUqKCbhdVfr3wlQ-eW8p_zujWRMu0';
-const N1717ML_maintenance_data_ranges=['routine_time!B1:C2','routine_time!A7:D','routine_use!B1:B2','routine_use!A7:D','one_off!A2:D'];
+const N1717ML_maintenance_data_ranges=['routine_time!B1:C2','routine_time!A7:D','routine_use!B1:B3','routine_use!A7:D','one_off!A2:D','log_entries!A1:D'];
 const tach_range='routine_use!B1'
 const db_location_of_maintenace_subscribers='/maintenance_subscribers';
 const db_location_of_reports='/reports';
@@ -117,7 +117,11 @@ function format_N1717ML_data(valueRanges){
 		days_to_go:'error',
 		hours_to_go:'error',
 		day_of_the_week:'error',
-		notable_risks:[]
+		notable_risks:[],
+		todays_hobbs:'error',
+		last_log_date: 'error',
+		last_log_tach: 'error',
+		last_log_entry:'error'
 	}
 
     //{first grab the rows from the first (zeroth) data set which has dates
@@ -141,6 +145,7 @@ function format_N1717ML_data(valueRanges){
 	tachs=valueRanges[2].values;
 	maintenance_summary_object.todays_tach=tachs[0][0];
 	maintenance_summary_object.hours_to_go=tachs[1][0];
+	maintenance_summary_object.todays_hobbs=tachs[2][0];
 	console.log('Mainteance data gathered: ' + 'Tach is at: ' +maintenance_summary_object.todays_tach+ '. You have ' +maintenance_summary_object.hours_to_go + ' hours left until you are late on plane maintence.');
 	//}
 	
@@ -163,6 +168,17 @@ function format_N1717ML_data(valueRanges){
 			maintenance_summary_object.notable_risks.push(risk);
 		}
 	});	
+	//}
+	
+	//{oh also add the most recent log entry to the report.
+	entries=valueRanges[5].values;
+	entries.map((entry)=>{
+		maintenance_summary_object.last_log_date=entry[0];
+		maintenance_summary_object.last_log_tach=entry[1];
+		maintenance_summary_object.last_log_entry=entry[3];
+	});
+	
+
 	//}
 	
 	//{take this data and make an HTML display from it.
@@ -199,6 +215,12 @@ function format_N1717ML_data(valueRanges){
 		maintenance_summary_object.report_html=maintenance_summary_object.report_html+`<tr><td>${nearterm_maintenance[0]}</td>    <td></td><td></td><td></td><td></td><td></td><td></td>      <td>${nearterm_maintenance[3]} ${nearterm_maintenance[4]}</p>`;
 	});			
 	maintenance_summary_object.report_html=maintenance_summary_object.report_html+'</table>'	
+	maintenance_summary_object.report_html=maintenance_summary_object.report_html+`
+	<h2 style="display:inline;margin-bottom:0px;">Tach Time: `+maintenance_summary_object.todays_tach+`   Hobbs Time: `+maintenance_summary_object.todays_hobbs+`</h2>
+	<p> Latest maintenance done was on `+ maintenance_summary_object.last_log_date+ ` with ` + maintenance_summary_object.last_log_tach + ` hours:  `+  maintenance_summary_object.last_log_entry +`<p>`
+	
+
+	
 	//}
 	
 	return maintenance_summary_object;
@@ -362,6 +384,12 @@ function send_bulk_emails(destination_addresses,subject,html){
 
 //{====================FIREBASE CLOUD FUNCTIONS===============
 
+//when the webhook is triggered, the oil tach time is updated.
+/* exports.update_oil_tach = functions.https.onRequest((req, res) => {
+	
+}); */
+
+
 //gets tach and hobbs from incoming telem data and stores it to firebase.
 exports.grab_tach_and_hobbs = functions.storage.object().onFinalize(async (object) => {
 	const fileBucket = object.bucket; // The Storage bucket that contains the file.
@@ -398,12 +426,18 @@ exports.grab_tach_and_hobbs = functions.storage.object().onFinalize(async (objec
 			console.log('BEFORE receiving this tlm file the tach time in the realtime database was: '+ current_tach_time.toString());
 			tlm_rows.forEach(row=>{
 				tlm_tach_time=Number(row['tach_time']);
+				tlm_hobbs_time=Number(row['hobbs_time']);
 				if(tlm_tach_time>current_tach_time){
 					current_tach_time=tlm_tach_time;
+					current_hobbs_time=tlm_hobbs_time;
 				}
 			});
 			console.log('AFTER receiving this tlm file the tach time in the realtime will be set to: '+ current_tach_time.toString());
 			return(update_database(db_location_of_reports,{"current_tach_time":current_tach_time}));
+		})
+		.then((db_response)=>{
+			console.log(db_response);
+			return(update_database(db_location_of_reports,{"current_hobbs_time":current_hobbs_time}));
 		})
 		
 		
