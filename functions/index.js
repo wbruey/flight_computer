@@ -423,6 +423,7 @@ exports.grab_tach_and_hobbs = functions.storage.object().onFinalize(async (objec
 	//}
 	// Get the file name.
 	const fileName = path.basename(filePath);
+	var last_time_flown=fileName.substring(0,fileName.length-4);
 	
 	const tempFilePath = path.join(os.tmpdir(), fileName);
 	const metadata = {
@@ -454,10 +455,15 @@ exports.grab_tach_and_hobbs = functions.storage.object().onFinalize(async (objec
 			console.log('AFTER receiving this tlm file the tach time in the realtime will be set to: '+ current_tach_time.toString());
 			return(update_database(db_location_of_reports,{"current_tach_time":current_tach_time}));
 		})
-		.then((db_response)=>{
-			console.log(db_response);
+		.then((db_response)=>{	
 			return(update_database(db_location_of_reports,{"current_hobbs_time":current_hobbs_time}));
 		})
+		.then((db_response)=>{
+			return(update_database(db_location_of_reports,{"last_time_flown":last_time_flown}));
+		})
+
+		
+		
 		
 		
 //this shit below is intended to update my tach cell in my maintenance spreadsheet, however, i dont want to bother with the whole OATUH thing which i dont even know will work since its for human logins
