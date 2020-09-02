@@ -418,91 +418,98 @@ exports.grab_tach_and_hobbs = functions.storage.object().onFinalize(async (objec
 	const metageneration = object.metageneration; // Number of times metadata has been generated. New objects have a value of 1.
 	// Exit if this is triggered on a file that is not an image.
 	console.log(contentType);
-	//if (!contentType.startsWith('flight_telem/')) {
-	//  return console.log('This is not a flight telem file.');
-	//}
-	// Get the file name.
-	const fileName = path.basename(filePath);
-	var last_time_flown=fileName.substring(0,fileName.length-4);
-	
-	const tempFilePath = path.join(os.tmpdir(), fileName);
-	const metadata = {
-	  contentType: contentType,
-	};	
-	const bucket = admin.storage().bucket(fileBucket);
-	await bucket.file(filePath).download({destination: tempFilePath});
- 	console.log('Telem file downloaded locally to', tempFilePath);
-	const tlm_rows = [];
-	fs.createReadStream(tempFilePath)
-	.pipe(csv())
-	.on('data',(data)=>tlm_rows.push(data))
-	.on('end',()=>{
-		//console.log(tlm_rows);
-		//console.log(typeof tlm_rows);
-		//find the max tach of the table.
-		get_database_tranche(db_location_of_reports+'/current_tach_time')
-		.then((current_tach_time)=>{
-			current_tach_time=Number(current_tach_time);
-			console.log('BEFORE receiving this tlm file the tach time in the realtime database was: '+ current_tach_time.toString());
-			tlm_rows.forEach(row=>{
-				tlm_tach_time=Number(row['tach_time']);
-				tlm_hobbs_time=Number(row['hobbs_time']);
-				if(tlm_tach_time>current_tach_time){
-					current_tach_time=tlm_tach_time;
-					current_hobbs_time=tlm_hobbs_time;
-				}
-			});
-			console.log('AFTER receiving this tlm file the tach time in the realtime will be set to: '+ current_tach_time.toString());
-			return(update_database(db_location_of_reports,{"current_tach_time":current_tach_time}));
-		})
-		.then((db_response)=>{	
-			return(update_database(db_location_of_reports,{"current_hobbs_time":current_hobbs_time}));
-		})
-		.then((db_response)=>{
-			return(update_database(db_location_of_reports,{"last_time_flown":last_time_flown}));
-		})
+	if (!filePath.startsWith('flight_telem/')) {
+	  return console.log('This is not a flight telem file.');
+	}else{
+		// Get the file name.
+		const fileName = path.basename(filePath);
+		var last_time_flown=fileName.substring(0,fileName.length-4);
+		var current_tach_time=0;
+		var current_hobbs_time=0;
+		
+		const tempFilePath = path.join(os.tmpdir(), fileName);
+		const metadata = {
+		  contentType: contentType,
+		};	
+		const bucket = admin.storage().bucket(fileBucket);
+		await bucket.file(filePath).download({destination: tempFilePath});
+		console.log('Telem file downloaded locally to', tempFilePath);
+		const tlm_rows = [];
+		fs.createReadStream(tempFilePath)
+		.pipe(csv())
+		.on('data',(data)=>tlm_rows.push(data))
+		.on('end',()=>{
+			//console.log(tlm_rows);
+			//console.log(typeof tlm_rows);
+			//find the max tach of the table.
+			get_database_tranche(db_location_of_reports+'/current_tach_time')
+			.then((current_tach_time)=>{
+				current_tach_time=Number(current_tach_time);
+				get_database_tranche(db_location_of_reports+'/current_hobbs_time')); 
+			})
+			.then((current_hobbs_time)=>{
+				current_hobbs_time=Number(current_hobbs_time);
+				console.log('BEFORE receiving this tlm file the tach time in the realtime database was: '+ current_tach_time.toString());
+				tlm_rows.forEach(row=>{
+					tlm_tach_time=Number(row['tach_time']);
+					tlm_hobbs_time=Number(row['hobbs_time']);
+					if(tlm_tach_time>current_tach_time){
+						current_tach_time=tlm_tach_time;
+						current_hobbs_time=tlm_hobbs_time;
+					}
+				});
+				console.log('AFTER receiving this tlm file the tach time in the realtime will be set to: '+ current_tach_time.toString());
+				return(update_database(db_location_of_reports,{"current_tach_time":current_tach_time}));
+			})
+			.then((db_response)=>{	
+				return(update_database(db_location_of_reports,{"current_hobbs_time":current_hobbs_time}));
+			})
+			.then((db_response)=>{
+				return(update_database(db_location_of_reports,{"last_time_flown":last_time_flown}));
+			})
 
-		
-		
-		
-		
-//this shit below is intended to update my tach cell in my maintenance spreadsheet, however, i dont want to bother with the whole OATUH thing which i dont even know will work since its for human logins
-//therefore, i wrote a google app script and bound it to the maintenance spreadsheet, which is effectively writing your own "excel function" which grabs the tach from the firebase database. 
-/* 		.then((db_response)=>{
-			console.log(db_response);
-			return(get_database_tranche(db_location_of_reports+'/current_tach_time'));
-		})
-		.then((current_tach_time)=>{
-			return(update_spreadsheet_range(N1717ML_maintenance_spreadsheet_id,tach_range,current_tach_time));			
-		})
-		.then((result)=>{
-			console.log('updated the maintenance spreadsheet with the new tach time');
-			console.log(result.updatedCells);
-			return 0;
-		}); */
-		
-		//now just run the same code as store_maintance_summary, so that it is all fresh and up to date. 
-		// nah not gonna do that either cause of this shit delay, im going to just have my html update script run every minute
-/* 		.then((db_response)=>{
-			console.log(db_response);
-			console.log('start wait');
-			return(wait_bro(90));
-		})
-		.then((trash)=>{
-			console.log('end wait');
-			return(grab_batch_spreadsheet_data(N1717ML_maintenance_spreadsheet_id,N1717ML_maintenance_data_ranges));
-		})
-		.then((valueRanges) =>{
-			//console.log(valueRanges)
-			maintenance_summary=format_N1717ML_data(valueRanges);
-			return(update_database(db_location_of_reports,{"maintenance_summary_html":maintenance_summary.report_html}));} */
 			
 			
-		.then((db_response)=>{
-			console.log(db_response);
-			return 0;
-		});
-	});		
+			
+			
+	//this shit below is intended to update my tach cell in my maintenance spreadsheet, however, i dont want to bother with the whole OATUH thing which i dont even know will work since its for human logins
+	//therefore, i wrote a google app script and bound it to the maintenance spreadsheet, which is effectively writing your own "excel function" which grabs the tach from the firebase database. 
+	/* 		.then((db_response)=>{
+				console.log(db_response);
+				return(get_database_tranche(db_location_of_reports+'/current_tach_time'));
+			})
+			.then((current_tach_time)=>{
+				return(update_spreadsheet_range(N1717ML_maintenance_spreadsheet_id,tach_range,current_tach_time));			
+			})
+			.then((result)=>{
+				console.log('updated the maintenance spreadsheet with the new tach time');
+				console.log(result.updatedCells);
+				return 0;
+			}); */
+			
+			//now just run the same code as store_maintance_summary, so that it is all fresh and up to date. 
+			// nah not gonna do that either cause of this shit delay, im going to just have my html update script run every minute
+	/* 		.then((db_response)=>{
+				console.log(db_response);
+				console.log('start wait');
+				return(wait_bro(90));
+			})
+			.then((trash)=>{
+				console.log('end wait');
+				return(grab_batch_spreadsheet_data(N1717ML_maintenance_spreadsheet_id,N1717ML_maintenance_data_ranges));
+			})
+			.then((valueRanges) =>{
+				//console.log(valueRanges)
+				maintenance_summary=format_N1717ML_data(valueRanges);
+				return(update_database(db_location_of_reports,{"maintenance_summary_html":maintenance_summary.report_html}));} */
+				
+				
+			.then((db_response)=>{
+				console.log(db_response);
+				return 0;
+			});
+		});	
+	}
 });
 
 
